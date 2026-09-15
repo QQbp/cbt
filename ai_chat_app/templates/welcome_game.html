@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>想法・情緒・行為</title>
+<style>
+  :root{
+    --bg-top:#F3EFE6;
+    --bg-bottom:#E9E2D2;
+    --ink:#3B3229;
+    --ink-soft:#6B6053;
+  }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    overflow:hidden;
+    background: radial-gradient(ellipse at 50% 0%, var(--bg-top), var(--bg-bottom));
+    font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC","Heiti TC",sans-serif;
+  }
+  #stage{ position:relative; width:100%; height:100%; }
+  .header{
+    position:absolute; top:3%; left:0; right:0;
+    text-align:center; pointer-events:none;
+  }
+  .header h1{
+    margin:0; font-size:clamp(18px,2.6vw,28px);
+    letter-spacing:0.15em; color:var(--ink); font-weight:700;
+  }
+  .header p{
+    margin:5px 0 0; font-size:clamp(11px,1.3vw,14px);
+    color:var(--ink-soft); letter-spacing:0.03em;
+  }
+  #levelBadge{
+    position:absolute; top:3%; right:3%;
+    background:rgba(255,255,255,0.65); color:var(--ink-soft);
+    font-size:13px; font-weight:600; padding:5px 14px;
+    border-radius:999px; letter-spacing:0.05em;
+  }
+  #skipLink{
+    position:absolute; top:3%; left:3%; z-index:6;
+    font-size:12px; color:var(--ink-soft); text-decoration:none;
+    background:rgba(255,255,255,0.55); padding:5px 14px;
+    border-radius:999px; letter-spacing:0.03em;
+  }
+  #skipLink:hover{ background:rgba(255,255,255,0.85); }
+  canvas{ display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+  canvas.dragging{ cursor:grabbing; }
+  .footer{
+    position:absolute; bottom:2.5%; left:0; right:0;
+    text-align:center; pointer-events:none;
+  }
+  .footer span{
+    font-size:clamp(11px,1.2vw,13px); color:var(--ink-soft);
+    background:rgba(255,255,255,0.55); padding:6px 16px;
+    border-radius:999px; letter-spacing:0.03em;
+  }
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(30,26,20,0.45); z-index:10;
+  }
+  .overlay.hidden{ display:none; }
+  .overlay .card{
+    background:#FBF7EE; border-radius:20px; padding:32px 40px;
+    text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.25); max-width:360px;
+  }
+  .overlay h2{ margin:0 0 10px; font-size:26px; color:var(--ink); }
+  .overlay p{ margin:0 0 22px; color:var(--ink-soft); font-size:14px; line-height:1.5; }
+  .overlayBtns{ display:flex; gap:12px; justify-content:center; }
+  .overlayBtns button{
+    font-family:inherit; font-size:15px; font-weight:600;
+    padding:10px 22px; border-radius:999px; border:none;
+    cursor:pointer; transition:transform .15s ease;
+  }
+  #btnNext{ background:#5B8C7B; color:#fff; }
+  #btnEnd{ background:transparent; color:var(--ink-soft); border:1.5px solid #C9BFA9; }
+  .overlayBtns button:hover{ transform:translateY(-1px); }
+
+  #handToggleBtn{
+    position:absolute; bottom:2.5%; left:3%;
+    z-index:5;
+    font-family:inherit; font-size:13px; font-weight:600;
+    padding:8px 16px; border-radius:999px; border:none;
+    background:rgba(255,255,255,0.75); color:var(--ink);
+    cursor:pointer; letter-spacing:0.03em;
+  }
+  #handToggleBtn:hover{ background:rgba(255,255,255,0.95); }
+  #handPreviewWrap{
+    position:absolute; bottom:calc(2.5% + 44px); left:3%;
+    z-index:5;
+    width:150px; height:112px;
+    border-radius:10px; overflow:hidden;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+    border:2px solid rgba(255,255,255,0.7);
+    display:none;
+    background:#111;
+  }
+  #handPreviewWrap.active{ display:block; }
+  #handPreviewCanvas{
+    width:100%; height:100%;
+    transform:scaleX(-1); /* mirror, feels natural like a mirror */
+  }
+  #handStatus{
+    position:absolute; bottom:2px; left:0; right:0;
+    text-align:center; font-size:10px; color:#fff;
+    background:rgba(0,0,0,0.45); padding:2px 0;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="header">
+    <h1>想法 ・ 情緒 ・ 行為</h1>
+    <p>玩家一開始沉在水底，←→移動、↓下沉，↑是跳躍（高度約一顆球的直徑),設法躍出水面撐滿 5 秒過關</p>
+  </div>
+  <div id="levelBadge">第 1 關</div>
+  <a id="skipLink" href="{{ url_for('chat_home') }}">略過，直接前往網站 →</a>
+  <canvas id="canvas"></canvas>
+  <div class="footer"><span>←→移動、↓下沉、↑跳躍（一次約一顆球的直徑高)；滑鼠可拖曳三顆球；也可以開啟攝影機用食指位置控制玩家；球停留在同一層超過五秒密度會趨近該層液體</span></div>
+
+  <button id="handToggleBtn">🖐 啟用食指控制</button>
+  <div id="handPreviewWrap">
+    <video id="handVideo" autoplay playsinline style="display:none"></video>
+    <canvas id="handPreviewCanvas" width="160" height="120"></canvas>
+    <div id="handStatus">尚未偵測到手部</div>
+  </div>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="card">
+      <h2 id="overlayTitle">🎉 過關！</h2>
+      <p id="overlaySubtitle"></p>
+      <div class="overlayBtns">
+        <button id="btnNext">🔄 再玩一關</button>
+        <button id="btnEnd">➡️ 前往網站</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlaySubtitle = document.getElementById('overlaySubtitle');
+  const overlayBtns = overlay.querySelector('.overlayBtns');
+  const btnNext = document.getElementById('btnNext');
+  const btnEnd = document.getElementById('btnEnd');
+  const levelBadge = document.getElementById('levelBadge');
+  const handToggleBtn = document.getElementById('handToggleBtn');
+  const handPreviewWrap = document.getElementById('handPreviewWrap');
+  const handVideo = document.getElementById('handVideo');
+  const handPreviewCanvas = document.getElementById('handPreviewCanvas');
+  const handPreviewCtx = handPreviewCanvas.getContext('2d');
+  const handStatus = document.getElementById('handStatus');
+
+  // hand-tracking control state: when active, the fingertip position
+  // drives the player directly, same as holding an arrow key would
+  const handControl = { active:false, x:0, y:0 };
+
+  let W, H, DPR, groundY;
+  function resize(){
+    DPR = window.devicePixelRatio || 1;
+    W = stage.clientWidth;
+    H = stage.clientHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    groundY = H * 0.20;
+    layoutNodes();
+  }
+
+  // nodes 0-2 = 想法 / 情緒 / 行為 (in the water), node 3 = the player
+  const PERSON_INDEX = 3;
+  const labels = ['想法','情緒','行為','玩家'];
+  const colors = ['#C97B5F','#5B8C7B','#4B6E8C'];
+  let nodes = [];
+  let segLengths = [180,180,220];
+  const BALL_RADIUS = 42;
+  const PERSON_RADIUS = 16; // the player is drawn much smaller than the balls
+
+  const LAYER_DEFS = [
+    { name:'第1層・最低密度', density:1.00, damping:0.93, rgb:[130,178,196], alpha:0.36 },
+    { name:'第2層・中低密度', density:1.25, damping:0.87, rgb:[96,148,175],  alpha:0.48 },
+    { name:'第3層・中密度',   density:1.50, damping:0.80, rgb:[66,116,142],  alpha:0.60 },
+    { name:'第4層・中高密度', density:1.75, damping:0.74, rgb:[42,84,106],   alpha:0.73 },
+    { name:'第5層・最高密度', density:2.00, damping:0.68, rgb:[20,40,54],    alpha:0.87 }
+  ];
+  const LAYER_COUNT = LAYER_DEFS.length;
+  const START_LAYER = 2;
+  const BUOY_K = 0.9;
+  const PERSON_DENSITY = LAYER_DEFS[LAYER_COUNT-1].density + 1.5; // far denser than any layer -> sinks like a rock
+  const BALL_START_DENSITY = 2.1; // heavier than every layer -> starts sinking straight to the bottom
+
+  const REST_FRAMES_TO_DRIFT = 300;
+  const DRIFT_RATE = 0.0009;
+  const WIN_FRAMES = 300; // ~5s at 60fps, time the player must stay above the surface
+
+  function layerBounds(){
+    const top = groundY - BALL_RADIUS;
+    const bottom = H - (BALL_RADIUS+10) + 20;
+    const segH = (bottom - top) / LAYER_COUNT;
+    const b = [];
+    for(let L=0; L<LAYER_COUNT; L++){
+      b.push({ top: top + L*segH, bottom: top + (L+1)*segH });
+    }
+    return b;
+  }
+
+  const PLANK_H = 14;
+  const PLANK_DEFS = [
+    { layer:0, xFrac:0.20, wFrac:0.28, yFrac:0.35, amplitude:45, speed:0.020, phase:0.0 },
+    { layer:0, xFrac:0.72, wFrac:0.24, yFrac:0.72, amplitude:50, speed:0.026, phase:1.1 },
+    { layer:1, xFrac:0.66, wFrac:0.30, yFrac:0.40, amplitude:48, speed:0.018, phase:2.2 },
+    { layer:1, xFrac:0.18, wFrac:0.24, yFrac:0.75, amplitude:40, speed:0.024, phase:3.3 },
+    { layer:2, xFrac:0.28, wFrac:0.32, yFrac:0.35, amplitude:56, speed:0.016, phase:0.6 },
+    { layer:2, xFrac:0.74, wFrac:0.26, yFrac:0.72, amplitude:44, speed:0.022, phase:1.8 },
+    { layer:3, xFrac:0.62, wFrac:0.30, yFrac:0.40, amplitude:50, speed:0.019, phase:2.9 },
+    { layer:3, xFrac:0.16, wFrac:0.24, yFrac:0.75, amplitude:38, speed:0.025, phase:4.0 },
+    { layer:4, xFrac:0.32, wFrac:0.32, yFrac:0.42, amplitude:52, speed:0.017, phase:0.9 },
+    { layer:4, xFrac:0.70, wFrac:0.26, yFrac:0.75, amplitude:42, speed:0.023, phase:2.5 }
+  ];
+
+  function getPlanks(){
+    const bounds = layerBounds();
+    return PLANK_DEFS.map(def => {
+      const band = bounds[def.layer];
+      const y = band.top + (band.bottom - band.top) * def.yFrac;
+      const width = W * def.wFrac;
+      const baseX = W * def.xFrac - width/2;
+      const offset = Math.sin(frameCount*def.speed + def.phase) * def.amplitude;
+      let x = baseX + offset;
+      x = Math.max(10, Math.min(W - 10 - width, x));
+      return { x, y, width, height: PLANK_H };
+    });
+  }
+
+  function resolvePlanks(){
+    const planks = getPlanks();
+    for(const n of nodes){
+      const r = n.radius;
+      const prevBottom = n.py + r;
+      const currBottom = n.y + r;
+      for(const p of planks){
+        const left = p.x - r*0.6;
+        const right = p.x + p.width + r*0.6;
+        if(n.x > left && n.x < right){
+          const plankTop = p.y - p.height/2;
+          if(prevBottom <= plankTop + 2 && currBottom > plankTop){
+            n.y = plankTop - r;
+            n.py = n.y;
+          }
+        }
+      }
+    }
+  }
+
+  let personRopeLength = null; // fixed once, so it never changes across resets/levels
+
+  function layoutNodes(){
+    const bounds = layerBounds();
+    const spawnBand = bounds[START_LAYER];
+    const ballY = (spawnBand.top + spawnBand.bottom) / 2;
+    const spacing = Math.min(170, W/4.5);
+    const cx = W/2;
+    const startX = cx - spacing;
+
+    const bottomBand = bounds[LAYER_COUNT-1];
+    const personX = cx;
+    const personY = bottomBand.bottom - PERSON_RADIUS - 6; // start at the very bottom
+
+    if(nodes.length === 0){
+      for(let i=0;i<3;i++){
+        const x = startX + i*spacing;
+        nodes.push({
+          x, y:ballY, px:x, py:ballY, invMass:1,
+          density: BALL_START_DENSITY,
+          submergedFrames: 0, radius: BALL_RADIUS
+        });
+      }
+      nodes.push({
+        x:personX, y:personY, px:personX, py:personY, invMass:1,
+        density: PERSON_DENSITY, submergedFrames:0, airFrames:0, radius: PERSON_RADIUS
+      });
+      const last = nodes[2];
+      if(personRopeLength === null){
+        personRopeLength = Math.max(90, Math.hypot(personX-last.x, personY-last.y));
+      }
+      segLengths = [
+        spacing,
+        spacing,
+        personRopeLength
+      ];
+    }
+  }
+
+  let dragIndex = -1;
+  let lastMouse = {x:0,y:0};
+
+  function getPos(evt){
+    const rect = canvas.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function hitTest(pos){
+    let closest = -1, minD = BALL_RADIUS*1.4;
+    for(let i=0;i<nodes.length;i++){
+      if(i === PERSON_INDEX) continue; // the player is keyboard-controlled, not draggable
+      const d = Math.hypot(nodes[i].x-pos.x, nodes[i].y-pos.y);
+      if(d < minD){ minD = d; closest = i; }
+    }
+    return closest;
+  }
+
+  function onDown(evt){
+    if(gameState !== 'playing') return;
+    const pos = getPos(evt);
+    const idx = hitTest(pos);
+    if(idx !== -1){
+      dragIndex = idx;
+      nodes[idx].invMass = 0;
+      nodes[idx].x = pos.x; nodes[idx].y = pos.y;
+      nodes[idx].px = pos.x; nodes[idx].py = pos.y;
+      canvas.classList.add('dragging');
+      evt.preventDefault();
+    }
+    lastMouse = pos;
+  }
+
+  function onMove(evt){
+    if(dragIndex === -1) return;
+    const pos = getPos(evt);
+    const n = nodes[dragIndex];
+    n.px = n.x; n.py = n.y;
+    n.x = pos.x; n.y = pos.y;
+    lastMouse = pos;
+    evt.preventDefault();
+  }
+
+  function onUp(evt){
+    if(dragIndex === -1) return;
+    const n = nodes[dragIndex];
+    n.px = n.x; n.py = n.y;
+    n.invMass = 1;
+    dragIndex = -1;
+    canvas.classList.remove('dragging');
+  }
+
+  canvas.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  canvas.addEventListener('touchstart', onDown, {passive:false});
+  window.addEventListener('touchmove', onMove, {passive:false});
+  window.addEventListener('touchend', onUp);
+
+  // keyboard control for the player: left/right/down move continuously,
+  // up performs a jump that climbs a fixed one-ball-diameter height over
+  // a short burst of frames — done as direct control so the player's very
+  // high density/water resistance can't cancel it out and strand them
+  const keys = { ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  const MOVE_SPEED = 2.4; // px per frame
+  const JUMP_HEIGHT = BALL_RADIUS * 2; // one ball diameter
+  const JUMP_DURATION = 22; // frames the climb takes (~0.37s at 60fps)
+  const JUMP_STEP = JUMP_HEIGHT / JUMP_DURATION;
+  let jumpFramesLeft = 0;
+
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      if(!e.repeat && jumpFramesLeft === 0) jumpFramesLeft = JUMP_DURATION;
+      return;
+    }
+    if(keys.hasOwnProperty(e.key)){
+      keys[e.key] = true;
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if(keys.hasOwnProperty(e.key)){
+      keys[e.key] = false;
+      e.preventDefault();
+    }
+  });
+
+  // ---- optional hand-tracking control (webcam + index fingertip) ----
+  let handsPipelineStarted = false;
+  let mpCamera = null;
+
+  function onHandResults(results){
+    handPreviewCtx.save();
+    handPreviewCtx.clearRect(0, 0, handPreviewCanvas.width, handPreviewCanvas.height);
+    handPreviewCtx.drawImage(results.image, 0, 0, handPreviewCanvas.width, handPreviewCanvas.height);
+
+    if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+      const tip = results.multiHandLandmarks[0][8]; // index fingertip
+      // map normalized coords to this game's canvas, mirrored so moving
+      // your finger right (from your own point of view) moves the player right
+      handControl.active = true;
+      handControl.x = (1 - tip.x) * W;
+      handControl.y = tip.y * H;
+      handStatus.textContent = '手指控制中';
+
+      // draw a dot on the preview at the tracked fingertip
+      handPreviewCtx.beginPath();
+      handPreviewCtx.arc(tip.x*handPreviewCanvas.width, tip.y*handPreviewCanvas.height, 6, 0, Math.PI*2);
+      handPreviewCtx.fillStyle = '#D9A441';
+      handPreviewCtx.fill();
+    } else {
+      handControl.active = false;
+      handStatus.textContent = '尚未偵測到手部';
+    }
+    handPreviewCtx.restore();
+  }
+
+  async function startHandTracking(){
+    if(handsPipelineStarted) return;
+    if(typeof Hands === 'undefined' || typeof Camera === 'undefined'){
+      handStatus.textContent = '手勢追蹤元件載入失敗';
+      return;
+    }
+    handsPipelineStarted = true;
+    handPreviewWrap.classList.add('active');
+    handStatus.textContent = '啟動攝影機中…';
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+    hands.onResults(onHandResults);
+
+    try{
+      mpCamera = new Camera(handVideo, {
+        onFrame: async () => { await hands.send({ image: handVideo }); },
+        width: 320,
+        height: 240
+      });
+      await mpCamera.start();
+    } catch(err){
+      handStatus.textContent = '無法取得攝影機權限';
+      handsPipelineStarted = false;
+      handPreviewWrap.classList.remove('active');
+    }
+  }
+
+  function stopHandTracking(){
+    handControl.active = false;
+    if(mpCamera && mpCamera.stop) mpCamera.stop();
+    handsPipelineStarted = false;
+    handPreviewWrap.classList.remove('active');
+  }
+
+  let handTrackingOn = false;
+  handToggleBtn.addEventListener('click', () => {
+    handTrackingOn = !handTrackingOn;
+    if(handTrackingOn){
+      handToggleBtn.textContent = '🖐 關閉食指控制';
+      startHandTracking();
+    } else {
+      handToggleBtn.textContent = '🖐 啟用食指控制';
+      stopHandTracking();
+    }
+  });
+
+  let playerMoving = false;
+  function applyPlayerControl(){
+    const person = nodes[PERSON_INDEX];
+    const jumping = jumpFramesLeft > 0 && gameState === 'playing';
+    let controlled = false;
+    let targetX = person.x, targetY = person.y;
+
+    if(handControl.active && gameState === 'playing'){
+      controlled = true;
+      targetX = handControl.x;
+      targetY = handControl.y;
+    } else if(keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight){
+      controlled = true;
+      let dx = 0, dy = 0;
+      if(keys.ArrowDown) dy += MOVE_SPEED;
+      if(keys.ArrowLeft) dx -= MOVE_SPEED;
+      if(keys.ArrowRight) dx += MOVE_SPEED;
+      targetX = person.x + dx;
+      targetY = person.y + dy;
+    }
+
+    if(jumping){
+      controlled = true;
+      targetY -= JUMP_STEP;
+      jumpFramesLeft--;
+    }
+
+    playerMoving = controlled && gameState === 'playing';
+    if(playerMoving){
+      person.invMass = 0; // controlled directly, physics (and water resistance) skip it this frame
+      person.px = person.x; person.py = person.y;
+      person.x = targetX; person.y = targetY;
+
+      const pad = PERSON_RADIUS + 10;
+      const ceilY = pad + 60;
+      const deepY = H - pad + 20;
+      person.x = Math.max(pad, Math.min(W - pad, person.x));
+      person.y = Math.max(ceilY, Math.min(deepY, person.y));
+    } else {
+      person.invMass = 1; // release back to normal physics (gravity/buoyancy/rope)
+    }
+  }
+
+  const DAMPING = 0.965;
+  const ITERATIONS = 16;
+  const GRAVITY = 0.55;
+
+  function findLayerIndex(bounds, y){
+    let layerIdx = LAYER_COUNT - 1;
+    for(let L=0; L<LAYER_COUNT; L++){
+      if(y <= bounds[L].bottom){ layerIdx = L; break; }
+    }
+    return layerIdx;
+  }
+
+  function updateResidenceDensity(n, layer){
+    n.submergedFrames++;
+    if(n.submergedFrames > REST_FRAMES_TO_DRIFT){
+      if(n.density < layer.density){
+        n.density = Math.min(layer.density, n.density + DRIFT_RATE);
+      } else if(n.density > layer.density){
+        n.density = Math.max(layer.density, n.density - DRIFT_RATE);
+      }
+    }
+  }
+
+  function integrate(){
+    const bounds = layerBounds();
+    for(let i=0;i<nodes.length;i++){
+      const n = nodes[i];
+      const waterLevel = groundY - n.radius;
+      const submerged = n.y > waterLevel;
+      const isPerson = (i === PERSON_INDEX);
+
+      if(isPerson){
+        n.airFrames = submerged ? 0 : (n.airFrames + 1);
+      } else if(submerged){
+        const layer = LAYER_DEFS[findLayerIndex(bounds, n.y)];
+        updateResidenceDensity(n, layer);
+      } else {
+        n.submergedFrames = 0;
+      }
+
+      if(n.invMass === 0) continue;
+
+      let damping = DAMPING;
+      let force = GRAVITY;
+      let vy = n.y - n.py;
+
+      if(submerged){
+        const layer = LAYER_DEFS[findLayerIndex(bounds, n.y)];
+        damping = layer.damping;
+        if(isPerson){
+          force = BUOY_K * (PERSON_DENSITY - layer.density); // far denser -> always sinks
+        } else {
+          force = BUOY_K * (n.density - layer.density);
+        }
+      }
+
+      const vx = (n.x - n.px) * damping;
+      const vyDamped = vy * damping + force;
+      n.px = n.x; n.py = n.y;
+      n.x += vx; n.y += vyDamped;
+    }
+  }
+
+  function solveConstraint(a,b,L){
+    const dx = b.x - a.x, dy = b.y - a.y;
+    let dist = Math.hypot(dx,dy);
+    if(dist < 0.0001) dist = 0.0001;
+    const diff = (dist - L) / dist;
+    const wa = a.invMass, wb = b.invMass;
+    const wsum = wa + wb;
+    if(wsum === 0) return;
+    const cx = dx * diff * (wa/wsum);
+    const cy = dy * diff * (wa/wsum);
+    const cx2 = dx * diff * (wb/wsum);
+    const cy2 = dy * diff * (wb/wsum);
+    a.x += cx; a.y += cy;
+    b.x -= cx2; b.y -= cy2;
+  }
+
+  function keepInBounds(){
+    for(const n of nodes){
+      if(n.invMass === 0) continue;
+      const pad = n.radius + 10;
+      const ceilY = pad + 60;
+      const deepY = H - pad + 20;
+      if(n.x < pad){ n.x = pad; n.px = n.x; }
+      if(n.x > W-pad){ n.x = W-pad; n.px = n.x; }
+      if(n.y < ceilY){ n.y = ceilY; n.py = n.y; }
+      if(n.y > deepY){ n.y = deepY; n.py = n.y; }
+    }
+  }
+
+  function step(){
+    applyPlayerControl();
+    integrate();
+    for(let it=0; it<ITERATIONS; it++){
+      for(let s=0; s<nodes.length-1; s++){
+        solveConstraint(nodes[s], nodes[s+1], segLengths[s]);
+      }
+    }
+    resolvePlanks();
+    keepInBounds();
+
+    if(gameState === 'playing' && nodes[PERSON_INDEX].airFrames > WIN_FRAMES){
+      triggerWin();
+    }
+  }
+
+  function hexToRgba(hex, a){
+    const v = hex.replace('#','');
+    const r = parseInt(v.substring(0,2),16);
+    const g = parseInt(v.substring(2,4),16);
+    const b = parseInt(v.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  let waveT = 0;
+
+  function drawPerson(n, isMoving, submerged, progress){
+    const x = n.x, y = n.y;
+    ctx.save();
+    ctx.strokeStyle = '#3B3229';
+    ctx.fillStyle = '#3B3229';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if(submerged) ctx.globalAlpha = 0.8;
+
+    if(isMoving){
+      ctx.beginPath();
+      ctx.arc(x, y, PERSON_RADIUS+8, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(217,164,65,0.18)';
+      ctx.fill();
+      ctx.fillStyle = '#3B3229';
+    }
+
+    if(!submerged && progress > 0){
+      ctx.beginPath();
+      ctx.arc(x, y-2, PERSON_RADIUS+6, -Math.PI/2, -Math.PI/2 + progress*Math.PI*2);
+      ctx.strokeStyle = 'rgba(217,164,65,0.95)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = '#3B3229';
+      ctx.lineWidth = 2;
+    }
+
+    // head
+    ctx.beginPath();
+    ctx.arc(x, y-13, 4.5, 0, Math.PI*2);
+    ctx.stroke();
+
+    // body
+    ctx.beginPath();
+    ctx.moveTo(x, y-8.5);
+    ctx.lineTo(x, y+5);
+    ctx.stroke();
+
+    // arms, straight out to the sides (rope ties at the waist)
+    ctx.beginPath();
+    ctx.moveTo(x-10, y-3);
+    ctx.lineTo(x+10, y-3);
+    ctx.stroke();
+
+    // legs
+    ctx.beginPath();
+    ctx.moveTo(x, y+5);
+    ctx.lineTo(x-6, y+15);
+    ctx.moveTo(x, y+5);
+    ctx.lineTo(x+6, y+15);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.font = '600 12px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#3B3229';
+    ctx.fillText('玩家', x, y-26);
+
+    ctx.font = '500 12px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    ctx.fillStyle = '#6B6053';
+    const statusText = submerged
+      ? '沉入水中'
+      : ('水面上 ' + (n.airFrames/60).toFixed(1) + ' 秒');
+    ctx.fillText(statusText, x, y+26);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    waveT += 0.035;
+
+    const bounds = layerBounds();
+    const waveHeight = 6;
+    const waveLength = 90;
+
+    for(let L=0; L<LAYER_COUNT; L++){
+      const layer = LAYER_DEFS[L];
+      const b = bounds[L];
+      const [r,g,bl] = layer.rgb;
+      ctx.fillStyle = `rgba(${r},${g},${bl},${layer.alpha})`;
+      ctx.beginPath();
+      if(L === 0){
+        ctx.moveTo(0, b.bottom);
+        ctx.lineTo(0, groundY);
+        for(let x=0; x<=W; x+=10){
+          const y = groundY + Math.sin(x/waveLength + waveT) * waveHeight;
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(W, b.bottom);
+      } else {
+        ctx.rect(0, b.top, W, b.bottom - b.top);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    for(let x=0; x<=W; x+=10){
+      const y = groundY + Math.sin(x/waveLength + waveT) * waveHeight;
+      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = 'rgba(210,235,242,0.6)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = '500 12px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    for(let L=0; L<LAYER_COUNT; L++){
+      const b = bounds[L];
+      ctx.beginPath();
+      ctx.moveTo(0, b.top);
+      ctx.lineTo(W, b.top);
+      ctx.setLineDash([5,7]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(LAYER_DEFS[L].name, 14, b.top + 6);
+    }
+
+    const planks = getPlanks();
+    for(const p of planks){
+      const top = p.y - p.height/2;
+      ctx.fillStyle = 'rgba(20,20,15,0.18)';
+      ctx.fillRect(p.x+2, top+p.height+2, p.width, 4);
+
+      const plankGrad = ctx.createLinearGradient(0, top, 0, top+p.height);
+      plankGrad.addColorStop(0, '#A9784E');
+      plankGrad.addColorStop(0.5, '#8B5E3C');
+      plankGrad.addColorStop(1, '#6B4226');
+      ctx.fillStyle = plankGrad;
+      ctx.beginPath();
+      ctx.roundRect(p.x, top, p.width, p.height, 4);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(60,35,18,0.35)';
+      ctx.lineWidth = 1;
+      for(let gx = p.x+8; gx < p.x+p.width-6; gx += 14){
+        ctx.beginPath();
+        ctx.moveTo(gx, top+2);
+        ctx.lineTo(gx+5, top+p.height-2);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = 'rgba(255,235,210,0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x+3, top+1.5);
+      ctx.lineTo(p.x+p.width-3, top+1.5);
+      ctx.stroke();
+    }
+
+    // connecting rope: 想法 -> 情緒 -> 行為 -> 玩家
+    ctx.beginPath();
+    ctx.moveTo(nodes[0].x, nodes[0].y);
+    for(let s=1; s<nodes.length; s++){
+      ctx.lineTo(nodes[s].x, nodes[s].y);
+    }
+    ctx.strokeStyle = '#B8AC98';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    for(let seg=0; seg<nodes.length-1; seg++){
+      const a = nodes[seg], b = nodes[seg+1];
+      for(let t=0.15; t<1; t+=0.22){
+        const x = a.x + (b.x-a.x)*t;
+        const y = a.y + (b.y-a.y)*t;
+        ctx.beginPath();
+        ctx.arc(x,y,2.4,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(107,96,83,0.35)';
+        ctx.fill();
+      }
+    }
+
+    // balls
+    for(let i=0;i<3;i++){
+      const n = nodes[i];
+      const color = colors[i];
+      const submerged = n.y + BALL_RADIUS*0.3 > groundY;
+
+      ctx.save();
+      if(submerged) ctx.globalAlpha = 0.78;
+
+      if(dragIndex === i){
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, BALL_RADIUS+14, 0, Math.PI*2);
+        ctx.fillStyle = hexToRgba(color, 0.18);
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y+4, BALL_RADIUS, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(59,50,41,0.12)';
+      ctx.fill();
+
+      const grad = ctx.createRadialGradient(n.x-BALL_RADIUS*0.3, n.y-BALL_RADIUS*0.35, BALL_RADIUS*0.1, n.x, n.y, BALL_RADIUS);
+      grad.addColorStop(0, hexToRgba(color, 1));
+      grad.addColorStop(1, hexToRgba(color, 0.85));
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, BALL_RADIUS, 0, Math.PI*2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      if(submerged){
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, BALL_RADIUS, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(92,148,173,0.28)';
+        ctx.fill();
+      }
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.stroke();
+      ctx.restore();
+
+      if(n.y - BALL_RADIUS < groundY && n.y + BALL_RADIUS > groundY){
+        ctx.beginPath();
+        ctx.ellipse(n.x, groundY, BALL_RADIUS*0.85, 5, 0, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '600 20px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labels[i], n.x, n.y-6);
+
+      ctx.font = '500 12px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText('密度 ' + n.density.toFixed(2), n.x, n.y+14);
+    }
+
+    // player (stick figure)
+    const person = nodes[PERSON_INDEX];
+    const personWaterLevel = groundY - person.radius;
+    const submerged = person.y > personWaterLevel;
+    const progress = !submerged ? Math.min(1, person.airFrames/WIN_FRAMES) : 0;
+    drawPerson(person, playerMoving, submerged, progress);
+  }
+
+  let gameState = 'playing';
+  let level = 1;
+  let frameCount = 0;
+
+  function showOverlay(title, subtitle, showButtons){
+    overlayTitle.textContent = title;
+    overlaySubtitle.textContent = subtitle;
+    overlayBtns.style.display = showButtons ? 'flex' : 'none';
+    overlay.classList.remove('hidden');
+  }
+  function hideOverlay(){ overlay.classList.add('hidden'); }
+
+  function triggerWin(){
+    gameState = 'won';
+    showOverlay('🎉 過關！', `第 ${level} 關完成——玩家成功游上水面並撐滿了 5 秒。要繼續玩下一關，還是要前往網站呢？`, true);
+  }
+
+  function resetLevel(){
+    nodes.length = 0;
+    layoutNodes();
+    jumpFramesLeft = 0;
+    for(const def of PLANK_DEFS){
+      def.speed = Math.min(0.05, def.speed * 1.08);
+      def.amplitude = Math.min(80, def.amplitude * 1.06);
+    }
+  }
+
+  btnNext.addEventListener('click', () => {
+    level++;
+    levelBadge.textContent = '第 ' + level + ' 關';
+    hideOverlay();
+    resetLevel();
+    gameState = 'playing';
+  });
+
+  btnEnd.addEventListener('click', () => {
+    window.location.href = "{{ url_for('chat_home') }}";
+  });
+
+  function loop(){
+    frameCount++;
+    if(gameState === 'playing') step();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  loop();
+})();
+</script>
+</body>
+</html>

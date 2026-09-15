@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}小路路{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav class="navbar">
+    <div class="nav-left">
+        <a href="{{ url_for('chat_home') }}" class="brand">小路路</a>
+    </div>
+    <div class="nav-right">
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('chat_home') }}">開始對話</a>
+            <a href="{{ url_for('history') }}">歷史紀錄</a>
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_ai_list') }}">管理後台</a>
+            {% endif %}
+            <div class="gesture-menu-wrap">
+                <button type="button" id="btn-gesture-mouse" class="btn-gesture" onclick="toggleGestureMouse()">🖐️ 空中滑鼠</button>
+                <div id="gesture-menu" class="gesture-menu" style="display:none;">
+                    <p class="gesture-menu-title">請選擇手勢分工：</p>
+                    <label>
+                        <input type="radio" name="gesture-hand-role" value="left-move" checked>
+                        畫面左邊的手移動游標／右邊的手握拳點擊
+                    </label>
+                    <label>
+                        <input type="radio" name="gesture-hand-role" value="right-move">
+                        畫面右邊的手移動游標／左邊的手握拳點擊
+                    </label>
+                    <button type="button" class="btn-primary gesture-menu-start" onclick="confirmGestureMouseStart()">開始</button>
+                </div>
+            </div>
+            <button type="button" id="btn-voice-control" class="btn-gesture" onclick="toggleVoiceControl()">🎙️ 語音控制頁面</button>
+            <span class="user-tag">👤 {{ current_user.username }}</span>
+            <a href="{{ url_for('logout') }}">登出</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">登入</a>
+            <a href="{{ url_for('register') }}">註冊</a>
+        {% endif %}
+    </div>
+</nav>
+
+<script>
+    // 提供給 voice_control.js 使用的網址，讓語音指令知道「登出」「回首頁」等指令要導向哪裡
+    window.APP_ROUTES = {
+        home: "{{ url_for('chat_home') }}",
+        logout: "{{ url_for('logout') }}",
+        history: "{{ url_for('history') }}"
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        , admin: "{{ url_for('admin_ai_list') }}"
+        {% endif %}
+    };
+</script>
+
+<!-- 空中滑鼠功能：視訊預覽（右下角浮動視窗）、虛擬游標、狀態提示，預設隱藏 -->
+<div id="gesture-container" style="display:none;">
+    <video id="gesture-webcam" autoplay playsinline muted></video>
+</div>
+<div id="virtual-cursor"></div>
+<div id="gesture-status" class="gesture-status"></div>
+<div id="gesture-debug" class="gesture-status gesture-debug"></div>
+<div id="voice-control-status" class="voice-control-status"></div>
+
+<main class="container">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="flash-box">
+                {% for msg in messages %}
+                    <div class="flash-msg">{{ msg }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="{{ url_for('static', filename='gesture_mouse.js') }}"></script>
+<script src="{{ url_for('static', filename='voice_control.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}參考資料庫{% endblock %}
+{% block content %}
+<h2>管理後台：AI 參考資料庫（RAG）</h2>
+<p class="hint">
+    在這裡新增的資料，會自動切段、轉成向量（embedding）存起來。AI 對話時，系統會依照當下的內容，
+    自動比對哪幾段參考資料最相關，只把最相關的幾段交給 AI 參考——不是把整個資料庫全部塞進去，
+    所以就算放很多資料，也不容易超過 AI 能接收的長度上限（尤其是本機 Ollama 模型）。
+    每筆資料只會給你指定的那個 AI 參考（例如給日記模式 AI 的資料，只有日記模式 AI 看得到）。
+</p>
+
+<div class="admin-tabs">
+    <a href="{{ url_for('admin_ai_list') }}" class="tab">AI 指令設定</a>
+    <a href="{{ url_for('admin_knowledge_list') }}" class="tab active">參考資料庫</a>
+</div>
+
+<div class="ai-config-card">
+    <h3>新增一筆參考資料</h3>
+    <p class="small-hint">內容不限長短，長篇的文件也可以直接貼進去，系統會自動幫你切成好幾段分別向量化。</p>
+    <form method="POST" action="{{ url_for('admin_knowledge_add') }}">
+        <label>這筆資料要給哪一個 AI 參考？</label>
+        <select name="ai_type">
+            {% for ai_type in order %}
+                <option value="{{ ai_type }}">{{ labels[ai_type] }}</option>
+            {% endfor %}
+        </select>
+
+        <label>標題</label>
+        <input type="text" name="title" required>
+
+        <label>內容</label>
+        <textarea name="content" rows="5" required></textarea>
+
+        <button type="submit" class="btn-primary">新增</button>
+    </form>
+</div>
+
+<h3>目前已有的參考資料</h3>
+{% if not items %}
+<p class="hint">目前還沒有任何參考資料。</p>
+{% else %}
+<table class="data-table">
+    <thead>
+        <tr><th>給哪個 AI</th><th>標題</th><th>內容</th><th>向量化狀態</th><th>建立時間</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for item in items %}
+        <tr>
+            <td>{{ labels[item.ai_type] }}</td>
+            <td>{{ item.title }}</td>
+            <td class="content-cell">{{ item.content }}</td>
+            <td>
+                {% set count = chunk_counts.get(item.id, 0) %}
+                {% if count > 0 %}
+                    ✅ 已完成（{{ count }} 段）
+                {% else %}
+                    ⚠️ 尚未向量化
+                {% endif %}
+            </td>
+            <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('admin_knowledge_reembed', item_id=item.id) }}" style="display:inline;">
+                    <button type="submit" class="btn-danger-sm">重新向量化</button>
+                </form>
+                <form method="POST" action="{{ url_for('admin_knowledge_delete', item_id=item.id) }}"
+                      onsubmit="return confirm('確定要刪除這筆參考資料嗎？');" style="display:inline;">
+                    <button type="submit" class="btn-danger-sm">刪除</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

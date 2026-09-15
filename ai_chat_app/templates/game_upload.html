@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}上傳遊戲圖片{% endblock %}
+{% block content %}
+<h2>🖼️ 為《{{ game.title }}》上傳圖片</h2>
+<p class="hint">
+    AI 已經幫每個場景寫好了建議的圖片內容，你可以參考下面的說明，自己找照片或圖片上傳。
+    某個場景沒有上傳圖片也沒關係，遊玩時該場景就不會顯示圖片。
+</p>
+
+<form method="POST" action="{{ url_for('game_upload_submit', game_id=game.id) }}" enctype="multipart/form-data">
+    {% for node in node_list %}
+    <div class="ai-config-card upload-node-card">
+        <h3>場景 {{ loop.index }}{% if node.is_ending %}（結局：{{ node.ending_title or '' }}）{% endif %}</h3>
+        <p class="node-text-preview">{{ node.text }}</p>
+        {% if node.image_hint %}
+        <p class="small-hint">💡 建議上傳的圖片內容：{{ node.image_hint }}</p>
+        {% endif %}
+        <input type="file" name="image_{{ node.id }}" accept="image/*">
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn-primary">完成上傳，開始遊玩</button>
+</form>
+{% endblock %}

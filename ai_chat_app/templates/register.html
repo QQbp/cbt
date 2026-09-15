@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}註冊{% endblock %}
+{% block content %}
+<div class="form-card">
+    <h2>建立帳號</h2>
+    <form method="POST">
+        <label>帳號</label>
+        <input type="text" name="username" required autofocus>
+
+        <label>密碼</label>
+        <input type="password" name="password" required>
+
+        <label>確認密碼</label>
+        <input type="password" name="confirm" required>
+
+        <button type="submit" class="btn-primary">註冊</button>
+    </form>
+    <p class="form-footer">已經有帳號了？<a href="{{ url_for('login') }}">前往登入</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}管理 AI 指令{% endblock %}
+{% block content %}
+<h2>管理後台：訓練 / 下指令給 AI</h2>
+<p class="hint">
+    這裡總共有五個獨立的 AI，每一個 AI 都有自己專屬的「系統指令」(system prompt)。
+    修改某一個 AI 的指令，<strong>只會影響該名 AI</strong>，不會影響其他兩個。
+</p>
+
+<div class="admin-tabs">
+    <a href="{{ url_for('admin_ai_list') }}" class="tab active">AI 指令設定</a>
+    <a href="{{ url_for('admin_knowledge_list') }}" class="tab">參考資料庫</a>
+</div>
+
+{% for ai_type in order %}
+<div class="ai-config-card">
+    <h3>🤖 {{ labels[ai_type] }}
+        <span class="ai-type-tag">代碼：{{ ai_type }}</span>
+    </h3>
+    {% set cfg = configs.get(ai_type) %}
+    <form method="POST" action="{{ url_for('admin_ai_update', ai_type=ai_type) }}" class="ai-provider-form">
+        <label>系統指令（訓練內容）</label>
+        <textarea name="system_prompt" rows="6">{{ cfg.system_prompt if cfg else '' }}</textarea>
+
+        <label>AI 供應商</label>
+        <div class="provider-choice">
+            <label class="provider-radio">
+                <input type="radio" name="provider" value="gemini"
+                    {% if not cfg or cfg.provider == 'gemini' %}checked{% endif %}
+                    onchange="document.getElementById('ollama-fields-{{ ai_type }}').style.display='none';">
+                ☁️ Google Gemini（雲端 API，需要 GEMINI_API_KEY）
+            </label>
+            <label class="provider-radio">
+                <input type="radio" name="provider" value="ollama"
+                    {% if cfg and cfg.provider == 'ollama' %}checked{% endif %}
+                    onchange="document.getElementById('ollama-fields-{{ ai_type }}').style.display='block';">
+                💻 本機 Ollama 模型（跑在你自己電腦或伺服器上）
+            </label>
+        </div>
+
+        <div id="ollama-fields-{{ ai_type }}" class="ollama-fields"
+             style="display: {{ 'block' if cfg and cfg.provider == 'ollama' else 'none' }};">
+            <label>Ollama 模型名稱</label>
+            <input type="text" name="ollama_model"
+                   value="{{ cfg.ollama_model if cfg and cfg.ollama_model else 'llama3.1:8b' }}"
+                   placeholder="例如 llama3.1:8b（需要先用 ollama pull 下載過）">
+
+            <label>Ollama 服務網址</label>
+            <input type="text" name="ollama_base_url"
+                   value="{{ cfg.ollama_base_url if cfg and cfg.ollama_base_url else 'http://localhost:11434' }}"
+                   placeholder="本機預設為 http://localhost:11434">
+        </div>
+
+        <button type="submit" class="btn-primary">更新「{{ labels[ai_type] }}」的設定</button>
+    </form>
+    {% if cfg %}
+    <p class="small-hint">
+        最後更新時間：{{ cfg.updated_at.strftime('%Y-%m-%d %H:%M') }}｜
+        目前供應商：{{ '☁️ Gemini' if cfg.provider == 'gemini' else '💻 本機 Ollama（' + (cfg.ollama_model or '') + '）' }}
+    </p>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% endblock %}

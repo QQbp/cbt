@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}對話{% endblock %}
+{% block content %}
+
+{% if not conversation %}
+<div class="mode-select">
+    <h2>選擇對話模式</h2>
+    <p class="hint">日記模式適合記錄今天發生的事，主題模式適合針對特定主題深入聊聊。</p>
+    <form method="POST" action="{{ url_for('start_conversation') }}" class="mode-buttons">
+        <button type="submit" name="mode" value="diary" id="mode-btn-diary" class="mode-btn diary">📔 日記模式</button>
+        <button type="submit" name="mode" value="topic" id="mode-btn-topic" class="mode-btn topic">💬 主題模式</button>
+    </form>
+</div>
+
+{% else %}
+<div class="chat-wrapper" data-conversation-id="{{ conversation.id }}" data-ended="{{ 'true' if conversation.is_ended else 'false' }}">
+    <div class="chat-header">
+        <h2>{{ '📔 日記模式' if conversation.mode == 'diary' else '💬 主題模式' }}</h2>
+        <div class="chat-actions">
+            <label class="voice-toggle">
+                <input type="checkbox" id="toggle-ai-voice">
+                🔊 AI 語音回覆
+            </label>
+            <button id="btn-analyze" class="btn-secondary">📊 分析這段對話</button>
+            <button id="btn-story" class="btn-secondary story-btn">📖 生成故事</button>
+            <button id="btn-end" class="btn-danger" {% if conversation.is_ended %}disabled{% endif %}>結束對話</button>
+        </div>
+    </div>
+
+    <div id="chat-box" class="chat-box">
+        {% for m in messages %}
+            <div class="bubble {{ 'user' if m.role == 'user' else 'ai' }}">
+                <div class="bubble-role">{{ '你' if m.role == 'user' else 'AI' }}</div>
+                <div class="bubble-content">{{ m.content }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div id="analysis-box" class="analysis-box" style="display:none;"></div>
+    <div id="story-box" class="story-box" style="display:none;"></div>
+
+    <div id="game-generate-box" class="game-generate-box">
+        <p class="hint">📖 已經有故事了嗎？把它做成一個可以玩的互動選擇遊戲：</p>
+        <div class="image-mode-choice">
+            <label>
+                <input type="radio" name="image_mode" value="ai" checked>
+                🤖 AI 自動繪製 2D 插圖<span class="small-hint">（每個場景一張圖，會產生額外的圖像生成費用）</span>
+            </label>
+            <label>
+                <input type="radio" name="image_mode" value="search">
+                🔎 AI 自動搜尋網路圖片<span class="small-hint">（用免費圖庫現成照片，完全免費，但畫面不一定跟劇情完全吻合）</span>
+            </label>
+            <label>
+                <input type="radio" name="image_mode" value="upload">
+                🖼️ 我要自己上傳圖片<span class="small-hint">（AI 會先告訴你每個場景建議放什麼樣的照片）</span>
+            </label>
+        </div>
+        <button id="btn-game" class="btn-secondary game-btn">🎮 生成互動遊戲</button>
+    </div>
+    <div id="game-status" class="game-status" style="display:none;"></div>
+
+    <form id="chat-form" class="chat-input-row">
+        <button type="button" id="btn-mic" class="btn-mic" title="語音輸入" {% if conversation.is_ended %}disabled{% endif %}>🎤</button>
+        <input type="text" id="chat-input" placeholder="{{ '結束對話後無法再傳送訊息' if conversation.is_ended else '輸入訊息，或按左邊麥克風用說的...' }}" autocomplete="off" {% if conversation.is_ended %}disabled{% endif %}>
+        <button type="submit" class="btn-primary" {% if conversation.is_ended %}disabled{% endif %}>送出</button>
+    </form>
+    <p id="voice-status" class="voice-status"></p>
+    <div id="mic-mouse-prompt" class="mic-mouse-prompt" style="display:none;">
+        <p>語音控制頁面已關閉，滑鼠要切換成？</p>
+        <button type="button" id="mic-choice-gesture" class="btn-secondary">🖐️ 空中滑鼠</button>
+        <button type="button" id="mic-choice-normal" class="btn-secondary">🖱️ 一般滑鼠</button>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='chat.js') }}"></script>
+{% endif %}
+
+{% endblock %}

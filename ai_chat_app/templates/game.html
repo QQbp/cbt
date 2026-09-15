@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ game.title }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}">
+</head>
+<body class="game-page">
+<div id="game-root" class="game-root">
+    <a href="{{ url_for('chat_room', conversation_id=game.conversation_id) }}" class="back-link">← 回到對話</a>
+    <h1 id="game-title"></h1>
+    <div class="game-image-wrap">
+        <img id="game-image" src="" alt="場景插圖" style="display:none;">
+    </div>
+    <div id="game-image-credit" class="game-image-credit" style="display:none;"></div>
+    <div id="game-text" class="game-text"></div>
+    <div id="game-choices" class="game-choices"></div>
+    <button id="game-restart" class="btn-primary" style="display:none;">🔄 重新開始</button>
+</div>
+
+<script type="application/json" id="game-data">{{ game.data_json | replace("</script>", "<\\/script>") | safe }}</script>
+<script src="{{ url_for('static', filename='game.js') }}"></script>
+</body>
+</html>

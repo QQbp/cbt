@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}歷史紀錄{% endblock %}
+{% block content %}
+<h2>我的對話歷史</h2>
+{% if not conversations %}
+    <p class="hint">目前還沒有任何對話紀錄。</p>
+{% else %}
+<table class="data-table">
+    <thead>
+        <tr><th>模式</th><th>開始時間</th><th>狀態</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+        {% for c in conversations %}
+        <tr>
+            <td>{{ '📔 日記模式' if c.mode == 'diary' else '💬 主題模式' }}</td>
+            <td>{{ c.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ '已結束' if c.is_ended else '進行中' }}</td>
+            <td><a href="{{ url_for('chat_room', conversation_id=c.id) }}">查看 / 繼續</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
