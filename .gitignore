@@ -5,3 +5,4 @@ venv/
 README_INSTALL.md
 README_USAGE.md
 instance/
+.azure/
