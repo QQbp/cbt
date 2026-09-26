@@ -1,8 +1,8 @@
 __pycache__/
 venv/
 .env
-.env.example
-README_INSTALL.md
-README_USAGE.md
 instance/
 .azure/
+cbtproject-*.json
+*-service-account*.json
+*.mp4
