@@ -18,7 +18,7 @@ import requests
 from flask import current_app
 
 EMBEDDING_URL_TEMPLATE = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={api_key}"
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent"
 )
 EMBEDDING_MODEL = "gemini-embedding-001"
 
@@ -50,6 +50,24 @@ def split_into_chunks(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
 
 def embed_text(text: str) -> list:
+    """
+    把一段文字轉成向量（一組浮點數列表）。
+
+    有設定 Azure AI 就走 Azure，沒有才回頭用 Gemini，這樣後台不管把對話供應商
+    設成哪一家，向量化都能跟著現有的設定走，不需要兩邊都申請金鑰。
+    """
+    if current_app.config.get("AZURE_AI_ENDPOINT") and current_app.config.get("AZURE_AI_KEY"):
+        from azure_ai_client import AzureAIError, embed_text as embed_text_azure
+
+        try:
+            return embed_text_azure(text)
+        except AzureAIError as e:
+            raise RagError(str(e))
+
+    return _embed_text_gemini(text)
+
+
+def _embed_text_gemini(text: str) -> list:
     """呼叫 Gemini 的向量化 API，把一段文字轉成向量（一組浮點數列表）"""
     api_key = current_app.config.get("GEMINI_API_KEY")
     if not api_key:
@@ -58,11 +76,14 @@ def embed_text(text: str) -> list:
             "請參考安裝說明書於 .env 檔案中填入你的 Gemini API Key。"
         )
 
-    url = EMBEDDING_URL_TEMPLATE.format(model=EMBEDDING_MODEL, api_key=api_key)
+    url = EMBEDDING_URL_TEMPLATE.format(model=EMBEDDING_MODEL)
     payload = {"content": {"parts": [{"text": text}]}}
 
+    # 金鑰改放 HTTP 標頭，原因見 gemini_client._auth_headers 的說明
+    headers = {"x-goog-api-key": api_key}
+
     try:
-        resp = requests.post(url, json=payload, timeout=60)
+        resp = requests.post(url, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         detail = ""

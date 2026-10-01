@@ -18,6 +18,7 @@ from models import (
 from gemini_client import call_gemini, generate_image_base64, GeminiError
 from image_search_client import search_stock_image, ImageSearchError
 from ollama_client import call_ollama, OllamaError
+from azure_ai_client import call_azure_ai, AzureAIError
 from rag_utils import (
     split_into_chunks, embed_text, cosine_similarity,
     embedding_to_json, embedding_from_json, RagError,
@@ -262,7 +263,7 @@ def register_routes(app):
 
         try:
             ai_reply = _call_ai(ai_config, system_prompt, history, user_text)
-        except (GeminiError, OllamaError) as e:
+        except (GeminiError, OllamaError, AzureAIError) as e:
             return jsonify({"error": str(e)}), 500
 
         ai_msg = Message(conversation_id=conv.id, role="ai", content=ai_reply)
@@ -301,7 +302,7 @@ def register_routes(app):
 
         try:
             result = _call_ai(ai_config, system_prompt, [], transcript)
-        except (GeminiError, OllamaError) as e:
+        except (GeminiError, OllamaError, AzureAIError) as e:
             return jsonify({"error": str(e)}), 500
 
         analysis = Analysis(conversation_id=conv.id, content=result)
@@ -330,7 +331,7 @@ def register_routes(app):
 
         try:
             result = _call_ai(ai_config, system_prompt, [], transcript)
-        except (GeminiError, OllamaError) as e:
+        except (GeminiError, OllamaError, AzureAIError) as e:
             return jsonify({"error": str(e)}), 500
 
         story = Story(conversation_id=conv.id, content=result)
@@ -356,12 +357,17 @@ def register_routes(app):
         if image_mode not in ("ai", "upload", "search"):
             image_mode = "ai"
 
+        # AI 生成插圖目前只有 Gemini 提供，沒設定 Gemini 金鑰時自動改用 Unsplash 搜圖，
+        # 免得整個遊戲完全沒有圖片。回傳值會帶上實際使用的模式，前端照它顯示即可。
+        if image_mode == "ai" and not app.config.get("GEMINI_API_KEY"):
+            image_mode = "search"
+
         ai_config = AIConfig.query.filter_by(ai_type=AI_GAME).first()
         system_prompt = _build_system_prompt(AI_GAME, ai_config.system_prompt, query_text=story.content)
 
         try:
             raw = _call_ai(ai_config, system_prompt, [], story.content, max_output_tokens=12000)
-        except (GeminiError, OllamaError) as e:
+        except (GeminiError, OllamaError, AzureAIError) as e:
             return jsonify({"error": str(e)}), 500
 
         try:
@@ -560,6 +566,14 @@ def register_routes(app):
         依照這個 AI 目前設定的供應商，呼叫 Gemini 或是本機 Ollama 模型。
         兩種情況都可能拋出例外（GeminiError 或 OllamaError），呼叫端請一併攔截這兩種。
         """
+        if ai_config.provider == "azure":
+            return call_azure_ai(
+                system_prompt,
+                history,
+                user_message,
+                max_output_tokens=max_output_tokens,
+            )
+
         if ai_config.provider == "ollama":
             return call_ollama(
                 system_prompt,
@@ -607,8 +621,8 @@ def register_routes(app):
             flash("指令內容不可空白")
             return redirect(url_for("admin_ai_list"))
 
-        provider = request.form.get("provider", "gemini")
-        if provider not in ("gemini", "ollama"):
+        provider = request.form.get("provider", "azure")
+        if provider not in ("gemini", "azure", "ollama"):
             provider = "gemini"
         ollama_model = request.form.get("ollama_model", "").strip() or "llama3.1:8b"
         ollama_base_url = request.form.get("ollama_base_url", "").strip() or "http://localhost:11434"

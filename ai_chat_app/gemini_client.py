@@ -6,8 +6,20 @@ import requests
 from flask import current_app
 
 GEMINI_URL_TEMPLATE = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
+
+
+def _auth_headers(api_key: str) -> dict:
+    """
+    金鑰改用 HTTP 標頭傳送，而不是放在網址的 ?key= 參數裡。
+
+    原因有兩個：
+    1. Google 新發的「AQ.」開頭金鑰不接受 ?key= 的用法，會回 401
+       ACCESS_TOKEN_TYPE_UNSUPPORTED；標頭則兩種格式的金鑰都適用。
+    2. 金鑰不會出現在網址上，出錯時的錯誤訊息也就不會把金鑰一起印出來。
+    """
+    return {"x-goog-api-key": api_key}
 
 
 class GeminiError(Exception):
@@ -57,10 +69,10 @@ def call_gemini(system_prompt: str, history: list, user_message: str, max_output
         },
     }
 
-    url = GEMINI_URL_TEMPLATE.format(model=model, api_key=api_key)
+    url = GEMINI_URL_TEMPLATE.format(model=model)
 
     try:
-        resp = requests.post(url, json=payload, timeout=60)
+        resp = requests.post(url, json=payload, headers=_auth_headers(api_key), timeout=60)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         detail = ""
@@ -103,10 +115,10 @@ def generate_image_base64(prompt: str) -> str:
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
     }
-    url = GEMINI_URL_TEMPLATE.format(model=model, api_key=api_key)
+    url = GEMINI_URL_TEMPLATE.format(model=model)
 
     try:
-        resp = requests.post(url, json=payload, timeout=90)
+        resp = requests.post(url, json=payload, headers=_auth_headers(api_key), timeout=90)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         detail = ""

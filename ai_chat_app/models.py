@@ -117,9 +117,10 @@ class AIConfig(db.Model):
     system_prompt = db.Column(db.Text, nullable=False)
 
     # AI 供應商設定：
-    #   provider = "gemini"（預設，走 Google Gemini 雲端 API）
+    #   provider = "azure"（預設，走 Azure AI 雲端服務）
+    #            或 "gemini"（走 Google Gemini 雲端 API）
     #            或 "ollama"（走使用者自己電腦上的本機 Ollama 模型）
-    provider = db.Column(db.String(20), nullable=False, default="gemini")
+    provider = db.Column(db.String(20), nullable=False, default="azure")
     ollama_model = db.Column(db.String(100), nullable=True, default="llama3.1:8b")
     ollama_base_url = db.Column(db.String(200), nullable=True, default="http://localhost:11434")
 

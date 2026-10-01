@@ -25,8 +25,14 @@
         <label>AI 供應商</label>
         <div class="provider-choice">
             <label class="provider-radio">
+                <input type="radio" name="provider" value="azure"
+                    {% if not cfg or cfg.provider == 'azure' %}checked{% endif %}
+                    onchange="document.getElementById('ollama-fields-{{ ai_type }}').style.display='none';">
+                ☁️ Azure AI（雲端服務，需要 AZURE_AI_ENDPOINT 與 AZURE_AI_KEY）
+            </label>
+            <label class="provider-radio">
                 <input type="radio" name="provider" value="gemini"
-                    {% if not cfg or cfg.provider == 'gemini' %}checked{% endif %}
+                    {% if cfg and cfg.provider == 'gemini' %}checked{% endif %}
                     onchange="document.getElementById('ollama-fields-{{ ai_type }}').style.display='none';">
                 ☁️ Google Gemini（雲端 API，需要 GEMINI_API_KEY）
             </label>
@@ -56,7 +62,7 @@
     {% if cfg %}
     <p class="small-hint">
         最後更新時間：{{ cfg.updated_at.strftime('%Y-%m-%d %H:%M') }}｜
-        目前供應商：{{ '☁️ Gemini' if cfg.provider == 'gemini' else '💻 本機 Ollama（' + (cfg.ollama_model or '') + '）' }}
+        目前供應商：{% if cfg.provider == 'azure' %}☁️ Azure AI{% elif cfg.provider == 'gemini' %}☁️ Gemini{% else %}💻 本機 Ollama（{{ cfg.ollama_model or '' }}）{% endif %}
     </p>
     {% endif %}
 </div>

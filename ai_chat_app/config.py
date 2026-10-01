@@ -13,6 +13,17 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Azure AI（Azure OpenAI 相容介面）。端點長得像
+    # https://你的資源名稱.cognitiveservices.azure.com/
+    # 部署名稱是你在 Azure 上替模型取的名字，不一定等於模型本身的名稱。
+    AZURE_AI_ENDPOINT = os.environ.get("AZURE_AI_ENDPOINT", "")
+    AZURE_AI_KEY = os.environ.get("AZURE_AI_KEY", "")
+    AZURE_AI_CHAT_DEPLOYMENT = os.environ.get("AZURE_AI_CHAT_DEPLOYMENT", "gpt-5-mini")
+    AZURE_AI_EMBEDDING_DEPLOYMENT = os.environ.get(
+        "AZURE_AI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small"
+    )
+    AZURE_AI_API_VERSION = os.environ.get("AZURE_AI_API_VERSION", "2024-10-21")
+
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
     GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
